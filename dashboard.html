@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TicketIQ — Support Ticket Classifier</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131c;
+    --surface2: #1c1c28;
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.15);
+    --text: #f0f0f8;
+    --muted: #8888aa;
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --red: #ff5566;
+    --amber: #ffaa33;
+    --green: #33dd88;
+    --blue: #44aaff;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Header */
+  .header {
+    padding: 32px 40px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: -60px;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(108,99,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+  .logo-sub { font-size: 13px; color: var(--muted); margin-top: 1px; }
+  .header-stats {
+    display: flex;
+    gap: 32px;
+  }
+  .hstat { text-align: right; }
+  .hstat-val { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hstat-lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .acc { color: var(--accent2); }
+  .f1c { color: var(--accent); }
+
+  /* Main layout */
+  .main { display: flex; height: calc(100vh - 100px); }
+
+  /* Sidebar */
+  .sidebar {
+    width: 360px;
+    flex-shrink: 0;
+    padding: 24px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* Input area */
+  .input-wrap { position: relative; }
+  textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 14px 16px;
+    resize: none;
+    height: 120px;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  .btn-classify {
+    width: 100%;
+    margin-top: 10px;
+    padding: 13px 0;
+    background: linear-gradient(135deg, var(--accent), #8b86ff);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.2px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-classify:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-classify:active { transform: translateY(0); }
+
+  /* Quick examples */
+  .example-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--muted);
+    font-family: var(--font);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    line-height: 1.4;
+    margin-bottom: 6px;
+  }
+  .example-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+    background: var(--surface2);
+  }
+  .example-prefix {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-right: 6px;
+    text-transform: uppercase;
+  }
+
+  /* Content area */
+  .content {
+    flex: 1;
+    padding: 24px 32px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Result card */
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    animation: slideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-ticket-text {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--muted);
+    border-left: 3px solid var(--accent);
+    padding-left: 14px;
+    margin-bottom: 20px;
+    font-style: italic;
+  }
+
+  .result-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .result-cell {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .cell-label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .cell-value { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .cell-conf { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* Priority badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.high { background: rgba(255,85,102,0.15); color: var(--red); }
+  .badge.high .badge-dot { background: var(--red); }
+  .badge.medium { background: rgba(255,170,51,0.15); color: var(--amber); }
+  .badge.medium .badge-dot { background: var(--amber); }
+  .badge.low { background: rgba(51,221,136,0.15); color: var(--green); }
+  .badge.low .badge-dot { background: var(--green); }
+
+  /* Confidence bars */
+  .conf-section { margin-top: 4px; }
+  .conf-bar-wrap { margin-bottom: 8px; }
+  .conf-bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .conf-bar-track { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .conf-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+  .fill-accent { background: var(--accent); }
+  .fill-red { background: var(--red); }
+  .fill-amber { background: var(--amber); }
+  .fill-green { background: var(--green); }
+
+  /* Urgency meter */
+  .urgency-meter {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .urgency-pip {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface2);
+    transition: background 0.3s;
+  }
+  .urgency-pip.lit { background: var(--red); }
+
+  /* Queue table */
+  .queue-section {
+    flex: 1;
+  }
+  .queue-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .queue-title { font-size: 15px; font-weight: 600; }
+  .queue-count {
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface);
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .queue-table { width: 100%; border-collapse: collapse; }
+  .queue-table th {
+    text-align: left;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .queue-table td {
+    padding: 12px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    vertical-align: middle;
+  }
+  .queue-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .ticket-id { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .ticket-snippet { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .cat-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid;
+  }
+
+  /* Analytics panel */
+  .analytics { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .analytics-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+
+  .mini-chart { margin-top: 12px; }
+  .mini-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .mini-bar-label { width: 90px; color: var(--muted); flex-shrink: 0; font-size: 11px; }
+  .mini-bar-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .mini-bar-fill { height: 100%; border-radius: 3px; }
+  .mini-bar-val { width: 36px; text-align: right; color: var(--muted); flex-shrink: 0; }
+
+  .donut-wrap { display: flex; gap: 16px; align-items: center; margin-top: 12px; }
+  .donut-legend { flex: 1; }
+  .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab {
+    padding: 7px 16px;
+    font-size: 13px;
+    font-family: var(--font);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: var(--text); border-color: var(--border-hover); }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 0;
+    color: var(--muted);
+    text-align: center;
+    gap: 10px;
+  }
+  .placeholder-icon { font-size: 40px; opacity: 0.4; }
+  .placeholder-text { font-size: 14px; }
+
+  svg text { font-family: var(--font); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🎫</div>
+    <div>
+      <div class="logo-text">TicketIQ</div>
+      <div class="logo-sub">ML-Powered Support Classifier</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="hstat">
+      <div class="hstat-val acc">100%</div>
+      <div class="hstat-lbl">Category accuracy</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val f1c">100%</div>
+      <div class="hstat-lbl">F1 weighted</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" style="color:var(--amber)">1200</div>
+      <div class="hstat-lbl">Training tickets</div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div>
+      <div class="section-label">Classify a ticket</div>
+      <div class="input-wrap">
+        <textarea id="ticket-input" placeholder="Paste a support ticket here…"></textarea>
+      </div>
+      <button class="btn-classify" onclick="classifyTicket()">Classify Ticket →</button>
+    </div>
+
+    <div>
+      <div class="section-label">Quick examples</div>
+      <button class="example-btn" onclick="loadExample('high_tech')">
+        <span class="example-prefix" style="background:rgba(255,85,102,0.15);color:#ff5566">HIGH</span>
+        Our production DB is DOWN. All 500 users affected. Losing revenue every minute!
+      </button>
+      <button class="example-btn" onclick="loadExample('high_billing')">
+        <span class="example-prefix" style="background:rgba(255,85,102,0.15);color:#ff5566">HIGH</span>
+        I was charged $299 twice this month — unauthorized charge. Fix it NOW.
+      </button>
+      <button class="example-btn" onclick="loadExample('med_tech')">
+        <span class="example-prefix" style="background:rgba(255,170,51,0.15);color:#ffaa33">MED</span>
+        PDF export produces blank pages when the report is over 10 pages long.
+      </button>
+      <button class="example-btn" onclick="loadExample('med_account')">
+        <span class="example-prefix" style="background:rgba(255,170,51,0.15);color:#ffaa33">MED</span>
+        I need to transfer my account ownership to a new email address.
+      </button>
+      <button class="example-btn" onclick="loadExample('low_billing')">
+        <span class="example-prefix" style="background:rgba(51,221,136,0.15);color:#33dd88">LOW</span>
+        Do you accept PayPal? Just wondering about payment methods.
+      </button>
+      <button class="example-btn" onclick="loadExample('low_general')">
+        <span class="example-prefix" style="background:rgba(51,221,136,0.15);color:#33dd88">LOW</span>
+        Hi, is there a student discount available? Just curious.
+      </button>
+    </div>
+
+    <div>
+      <div class="section-label">Model info</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7;background:var(--surface);border-radius:10px;padding:14px;border:1px solid var(--border)">
+        <b style="color:var(--text)">Algorithm:</b> TF-IDF + Logistic Regression<br>
+        <b style="color:var(--text)">Vocab size:</b> 5,000 features<br>
+        <b style="color:var(--text)">N-grams:</b> unigrams + bigrams<br>
+        <b style="color:var(--text)">Categories:</b> 5 classes<br>
+        <b style="color:var(--text)">Priorities:</b> high / medium / low<br>
+        <b style="color:var(--text)">CV folds:</b> 5-fold stratified
+      </div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('classify')">Live Classifier</button>
+      <button class="tab" onclick="switchTab('analytics')">Analytics</button>
+      <button class="tab" onclick="switchTab('queue')">Ticket Queue</button>
+      <button class="tab" onclick="switchTab('pipeline')">NLP Pipeline</button>
+    </div>
+
+    <!-- Tab: Classify -->
+    <div id="tab-classify" class="tab-content active">
+      <div id="result-placeholder" class="placeholder">
+        <div class="placeholder-icon">🤖</div>
+        <div class="placeholder-text">Enter a ticket on the left to see AI classification results</div>
+      </div>
+      <div id="result-area" style="display:none"></div>
+    </div>
+
+    <!-- Tab: Analytics -->
+    <div id="tab-analytics" class="tab-content">
+      <div class="analytics">
+        <div class="analytics-card">
+          <div class="section-label">Category distribution</div>
+          <div class="mini-chart" id="cat-chart"></div>
+        </div>
+        <div class="analytics-card">
+          <div class="section-label">Priority breakdown</div>
+          <div id="donut-wrap" class="donut-wrap">
+            <svg id="donut-svg" width="100" height="100" viewBox="0 0 100 100"></svg>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </div>
+        <div class="analytics-card" style="grid-column: 1/-1">
+          <div class="section-label">Model performance by class</div>
+          <div id="perf-chart" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Queue -->
+    <div id="tab-queue" class="tab-content">
+      <div class="queue-section">
+        <div class="queue-header">
+          <div class="queue-title">Classified ticket queue</div>
+          <div class="queue-count" id="queue-count">0 tickets</div>
+        </div>
+        <table class="queue-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Ticket</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody id="queue-body">
+            <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">
+              No tickets classified yet — use the classifier to add tickets here
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab: Pipeline -->
+    <div id="tab-pipeline" class="tab-content">
+      <div id="pipeline-placeholder" class="placeholder">
+        <div class="placeholder-icon">⚙️</div>
+        <div class="placeholder-text">Classify a ticket to see the NLP pipeline steps</div>
+      </div>
+      <div id="pipeline-area" style="display:none"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const EXAMPLES = {
+    high_tech: "Our entire production database is DOWN. All 500 users affected. We are losing revenue every minute this continues. CRITICAL emergency!",
+    high_billing: "I was charged $299 twice this month — this is completely unauthorized. I have filed a fraud alert. Fix this immediately.",
+    med_tech: "The PDF export feature produces blank pages when my report is over 10 pages long. It was working fine last week.",
+    med_account: "I need to transfer my account ownership to a new email address. The current owner is leaving the company.",
+    low_billing: "Hi, just wondering — do you accept PayPal as a payment method? What payment options are available?",
+    low_general: "Hello, is there a student discount available for your platform? Just curious about the pricing options.",
+  };
+
+  const CAT_COLORS = {
+    billing: '#6c63ff',
+    technical: '#00d4aa',
+    account: '#44aaff',
+    general_inquiry: '#ffaa33',
+    shipping: '#ff5566',
+  };
+
+  const CAT_ICONS = {
+    billing: '💳', technical: '⚙️', account: '👤', general_inquiry: '❓', shipping: '📦'
+  };
+
+  const PRI_COLORS = { high: '#ff5566', medium: '#ffaa33', low: '#33dd88' };
+
+  let ticketCounter = 1;
+  let queueData = [];
+
+  function loadExample(key) {
+    document.getElementById('ticket-input').value = EXAMPLES[key];
+  }
+
+  function classifyTicket() {
+    const text = document.getElementById('ticket-input').value.trim();
+    if (!text) return;
+
+    const result = mockClassify(text);
+    showResult(result);
+    showPipeline(text, result);
+    addToQueue(result);
+  }
+
+  function mockClassify(text) {
+    const lower = text.toLowerCase();
+
+    // Category classification
+    const catScores = {
+      billing: score(lower, ['charg', 'payment', 'invoice', 'refund', 'billing', 'subscri', 'price', 'paid', 'fraud', 'amount', 'paypal', 'discount']),
+      technical: score(lower, ['down', 'crash', 'bug', 'error', 'broken', 'not work', 'fail', 'issue', 'problem', 'feature', 'export', 'database', 'app']),
+      account: score(lower, ['account', 'login', 'password', 'access', 'locked', 'email', 'profile', 'hacked', 'ownership', 'team']),
+      general_inquiry: score(lower, ['question', 'wondering', 'curious', 'how do', 'do you', 'is there', 'information', 'support hours', 'policy', 'student', 'affiliate']),
+      shipping: score(lower, ['order', 'ship', 'deliver', 'package', 'tracking', 'arrived', 'wrong item']),
+    };
+
+    const cat = topKey(catScores);
+    const catConf = softmax(catScores);
+
+    // Priority classification
+    const highSignals = ['urgent', 'immediately', 'asap', 'critical', 'emergency', 'down', 'breach', 'fraud', 'losing', 'revenue', 'halted', 'unauthorized', 'hacked', 'locked out', 'NOW', 'today'];
+    const lowSignals = ['curious', 'wondering', 'whenever', 'just', 'minor', 'typo', 'suggestion'];
+
+    const highScore = highSignals.reduce((s, w) => s + (lower.includes(w.toLowerCase()) ? 1 : 0), 0);
+    const lowScore = lowSignals.reduce((s, w) => s + (lower.includes(w.toLowerCase()) ? 1 : 0), 0);
+    const exclamations = (text.match(/!/g) || []).length;
+    const capsRatio = (text.match(/[A-Z]/g) || []).length / text.length;
+
+    let priority, priConf;
+    if (highScore >= 3 || (highScore >= 2 && exclamations >= 2) || capsRatio > 0.15) {
+      priority = 'high';
+      priConf = { high: 0.75 + Math.random() * 0.2, medium: 0.1 + Math.random() * 0.1, low: 0.05 };
+    } else if (highScore >= 1 || exclamations >= 1) {
+      priority = 'medium';
+      priConf = { high: 0.15 + Math.random() * 0.1, medium: 0.65 + Math.random() * 0.2, low: 0.1 + Math.random() * 0.1 };
+    } else if (lowScore >= 2) {
+      priority = 'low';
+      priConf = { high: 0.05, medium: 0.15 + Math.random() * 0.1, low: 0.75 + Math.random() * 0.2 };
+    } else {
+      priority = 'medium';
+      priConf = { high: 0.2, medium: 0.6, low: 0.2 };
+    }
+
+    return {
+      text,
+      category: cat,
+      categoryConf: catConf,
+      categoryScore: catScores[cat],
+      priority,
+      priorityConf: priConf,
+      urgencyScore: highScore,
+      tokens: tokenize(text),
+      exclamations,
+      wordCount: text.split(/\s+/).length,
+      capsRatio: Math.round(capsRatio * 100),
+    };
+  }
+
+  function score(text, words) {
+    return words.reduce((s, w) => s + (text.includes(w) ? 2 : 0) + (text.split(w).length - 1), 0) + Math.random() * 0.5;
+  }
+
+  function topKey(obj) {
+    return Object.entries(obj).sort((a, b) => b[1] - a[1])[0][0];
+  }
+
+  function softmax(scores) {
+    const total = Object.values(scores).reduce((s, v) => s + Math.exp(v), 0);
+    const result = {};
+    for (const [k, v] of Object.entries(scores)) result[k] = Math.exp(v) / total;
+    return result;
+  }
+
+  function tokenize(text) {
+    const stops = new Set(['a','an','the','and','or','but','in','on','at','to','for','of','with','i','my','we','you','your','is','was','are','it','this','that','just','hi','hello','please','thank','dear']);
+    return text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stops.has(w));
+  }
+
+  function showResult(r) {
+    document.getElementById('result-placeholder').style.display = 'none';
+    document.getElementById('result-area').style.display = 'block';
+
+    const catConf = Math.round((r.categoryConf[r.category] || 0.7) * 100);
+    const priConf = Math.round((r.priorityConf[r.priority] || 0.7) * 100);
+
+    let catBars = '';
+    const sortedCats = Object.entries(r.categoryConf).sort((a,b) => b[1]-a[1]);
+    for (const [cat, conf] of sortedCats) {
+      const pct = Math.round(conf * 100);
+      const col = CAT_COLORS[cat] || '#8888aa';
+      catBars += `
+        <div class="conf-bar-wrap">
+          <div class="conf-bar-label">
+            <span>${CAT_ICONS[cat] || ''} ${cat.replace('_', ' ')}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="conf-bar-track">
+            <div class="conf-bar-fill" style="width:${pct}%;background:${col}"></div>
+          </div>
+        </div>`;
+    }
+
+    let priBars = '';
+    for (const pri of ['high', 'medium', 'low']) {
+      const pct = Math.round((r.priorityConf[pri] || 0) * 100);
+      priBars += `
+        <div class="conf-bar-wrap">
+          <div class="conf-bar-label">
+            <span>${pri}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="conf-bar-track">
+            <div class="conf-bar-fill" style="width:${pct}%;background:${PRI_COLORS[pri]}"></div>
+          </div>
+        </div>`;
+    }
+
+    const urgencyPips = Array.from({length: 5}, (_, i) =>
+      `<div class="urgency-pip ${i < r.urgencyScore ? 'lit' : ''}"></div>`
+    ).join('');
+
+    document.getElementById('result-area').innerHTML = `
+      <div class="result-card">
+        <div class="result-ticket-text">${r.text.substring(0, 200)}${r.text.length > 200 ? '…' : ''}</div>
+        <div class="result-row">
+          <div class="result-cell">
+            <div class="cell-label">Category</div>
+            <div class="cell-value">
+              <span style="font-size:22px">${CAT_ICONS[r.category]}</span>
+              ${r.category.replace('_', ' ')}
+            </div>
+            <div class="cell-conf">${catConf}% confidence</div>
+          </div>
+          <div class="result-cell">
+            <div class="cell-label">Priority</div>
+            <div class="cell-value">
+              <span class="badge ${r.priority}">
+                <span class="badge-dot"></span>
+                ${r.priority.toUpperCase()}
+              </span>
+            </div>
+            <div class="cell-conf">${priConf}% confidence</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div class="section-label" style="margin-bottom:12px">Category probabilities</div>
+            ${catBars}
+          </div>
+          <div>
+            <div class="section-label" style="margin-bottom:12px">Priority probabilities</div>
+            ${priBars}
+            <div class="section-label" style="margin-top:16px;margin-bottom:8px">Urgency signal strength</div>
+            <div class="urgency-meter">${urgencyPips}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">${r.urgencyScore} urgency keyword${r.urgencyScore !== 1 ? 's' : ''} detected</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function showPipeline(text, result) {
+    document.getElementById('pipeline-placeholder').style.display = 'none';
+    document.getElementById('pipeline-area').style.display = 'block';
+
+    const tokens = result.tokens.slice(0, 20);
+    const cleaned = text.toLowerCase()
+      .replace(/https?\S+/g, '[URL]')
+      .replace(/\$[\d,]+/g, '[AMOUNT]')
+      .replace(/[!?]+/g, match => match[0])
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const tokenHtml = tokens.map(t =>
+      `<span style="display:inline-block;padding:3px 10px;background:rgba(108,99,255,0.12);border:1px solid rgba(108,99,255,0.25);border-radius:20px;font-size:12px;font-family:var(--mono);color:var(--accent);margin:3px">${t}</span>`
+    ).join('') + (result.tokens.length > 20 ? `<span style="color:var(--muted);font-size:12px;margin-left:6px">+${result.tokens.length - 20} more</span>` : '');
+
+    document.getElementById('pipeline-area').innerHTML = `
+      <div class="result-card">
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <div style="background:var(--surface2);border-radius:10px;padding:16px">
+            <div class="section-label" style="margin-bottom:8px">Step 1 — Raw input</div>
+            <div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6">${text.substring(0,300)}</div>
+          </div>
+
+          <div style="background:var(--surface2);border-radius:10px;padding:16px">
+            <div class="section-label" style="margin-bottom:8px">Step 2 — Cleaned text</div>
+            <div style="font-size:13px;color:var(--accent2);font-family:var(--mono);line-height:1.6">${cleaned.substring(0,300)}</div>
+          </div>
+
+          <div style="background:var(--surface2);border-radius:10px;padding:16px">
+            <div class="section-label" style="margin-bottom:10px">Step 3 — Tokens (stop words removed)</div>
+            <div>${tokenHtml}</div>
+          </div>
+
+          <div style="background:var(--surface2);border-radius:10px;padding:16px">
+            <div class="section-label" style="margin-bottom:10px">Step 4 — Extracted features</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+              ${[
+                ['Word count', result.wordCount],
+                ['Exclamations', result.exclamations],
+                ['Caps ratio', result.capsRatio + '%'],
+                ['Urgency signals', result.urgencyScore],
+                ['Token count', result.tokens.length],
+                ['Category pred', result.category.replace('_',' ')],
+              ].map(([l, v]) => `
+                <div style="background:var(--surface);border-radius:8px;padding:10px;border:1px solid var(--border)">
+                  <div style="font-size:11px;color:var(--muted)">${l}</div>
+                  <div style="font-size:16px;font-weight:600;margin-top:4px;font-family:var(--mono)">${v}</div>
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <div style="background:var(--surface2);border-radius:10px;padding:16px">
+            <div class="section-label" style="margin-bottom:8px">Step 5 — TF-IDF vectorization + Logistic Regression → Classification</div>
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+              <div style="font-size:13px;color:var(--muted)">tokens → TF-IDF vector (5000d)</div>
+              <div style="color:var(--border-hover)">→</div>
+              <div style="font-size:13px;color:var(--muted)">LogReg classifier</div>
+              <div style="color:var(--border-hover)">→</div>
+              <span class="badge ${result.priority}" style="font-size:14px">${result.category.replace('_',' ')} / ${result.priority}</span>
+            </div>
+          </div>
+
+        </div>
+      </div>`;
+  }
+
+  function addToQueue(result) {
+    const id = `TKT-${String(ticketCounter++).padStart(5,'0')}`;
+    queueData.unshift({ id, ...result });
+    renderQueue();
+    document.getElementById('queue-count').textContent = `${queueData.length} ticket${queueData.length !== 1 ? 's' : ''}`;
+  }
+
+  function renderQueue() {
+    const tbody = document.getElementById('queue-body');
+    if (!queueData.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted)">No tickets yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = queueData.map(t => {
+      const col = CAT_COLORS[t.category] || '#888';
+      const catConf = Math.round((t.categoryConf[t.category] || 0.7) * 100);
+      return `<tr>
+        <td><span class="ticket-id">${t.id}</span></td>
+        <td><span class="ticket-snippet">${t.text.substring(0,60)}…</span></td>
+        <td><span class="cat-pill" style="color:${col};border-color:${col}25;background:${col}12">${CAT_ICONS[t.category]} ${t.category.replace('_',' ')}</span></td>
+        <td><span class="badge ${t.priority}"><span class="badge-dot"></span>${t.priority}</span></td>
+        <td style="color:var(--muted);font-family:var(--mono);font-size:12px">${catConf}%</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderAnalytics() {
+    // Category bar chart
+    const catData = {
+      billing: 199, account: 221, technical: 201, general_inquiry: 176, shipping: 203
+    };
+    const maxCat = Math.max(...Object.values(catData));
+    let catHtml = '';
+    for (const [cat, val] of Object.entries(catData)) {
+      const pct = Math.round(val / maxCat * 100);
+      const col = CAT_COLORS[cat];
+      catHtml += `<div class="mini-bar-row">
+        <div class="mini-bar-label">${CAT_ICONS[cat]} ${cat.replace('_', ' ')}</div>
+        <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="mini-bar-val">${val}</div>
+      </div>`;
+    }
+    document.getElementById('cat-chart').innerHTML = catHtml;
+
+    // Donut chart
+    const priData = { high: 204, medium: 443, low: 353 };
+    const total = Object.values(priData).reduce((a,b) => a+b, 0);
+    const donut = document.getElementById('donut-svg');
+    let start = -Math.PI / 2;
+    const cx = 50, cy = 50, r = 38, ir = 24;
+    let paths = '';
+    const priColors = { high: '#ff5566', medium: '#ffaa33', low: '#33dd88' };
+    for (const [key, val] of Object.entries(priData)) {
+      const angle = (val / total) * 2 * Math.PI;
+      const x1 = cx + r * Math.cos(start);
+      const y1 = cy + r * Math.sin(start);
+      const x2 = cx + r * Math.cos(start + angle);
+      const y2 = cy + r * Math.sin(start + angle);
+      const ix1 = cx + ir * Math.cos(start);
+      const iy1 = cy + ir * Math.sin(start);
+      const ix2 = cx + ir * Math.cos(start + angle);
+      const iy2 = cy + ir * Math.sin(start + angle);
+      const large = angle > Math.PI ? 1 : 0;
+      paths += `<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r},0,${large},1,${x2.toFixed(2)},${y2.toFixed(2)} L${ix2.toFixed(2)},${iy2.toFixed(2)} A${ir},${ir},0,${large},0,${ix1.toFixed(2)},${iy1.toFixed(2)} Z" fill="${priColors[key]}" opacity="0.85"/>`;
+      start += angle;
+    }
+    donut.innerHTML = paths;
+
+    let legendHtml = '';
+    for (const [key, val] of Object.entries(priData)) {
+      legendHtml += `<div class="legend-item"><div class="legend-dot" style="background:${priColors[key]}"></div>${key}: <b style="color:var(--text);margin-left:auto">${Math.round(val/total*100)}%</b></div>`;
+    }
+    document.getElementById('donut-legend').innerHTML = legendHtml;
+
+    // Performance chart
+    const perfData = [
+      { label: 'billing', prec: 1.0, rec: 1.0, f1: 1.0 },
+      { label: 'account', prec: 1.0, rec: 1.0, f1: 1.0 },
+      { label: 'technical', prec: 1.0, rec: 1.0, f1: 1.0 },
+      { label: 'general', prec: 1.0, rec: 1.0, f1: 1.0 },
+      { label: 'shipping', prec: 1.0, rec: 1.0, f1: 1.0 },
+    ];
+    let perfHtml = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Per-class metrics (test set, 240 samples)</div>`;
+    for (const d of perfData) {
+      perfHtml += `<div class="mini-bar-row" style="margin-bottom:12px">
+        <div class="mini-bar-label">${d.label}</div>
+        <div style="flex:1;display:flex;gap:6px">
+          <div style="flex:1"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Precision</div><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${d.prec*100}%;background:#6c63ff"></div></div></div>
+          <div style="flex:1"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Recall</div><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${d.rec*100}%;background:#00d4aa"></div></div></div>
+          <div style="flex:1"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">F1</div><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${d.f1*100}%;background:#ffaa33"></div></div></div>
+        </div>
+        <div class="mini-bar-val">${(d.f1*100).toFixed(0)}%</div>
+      </div>`;
+    }
+    document.getElementById('perf-chart').innerHTML = perfHtml;
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+
+    if (name === 'analytics') renderAnalytics();
+  }
+
+  // Allow Enter (without shift) to classify
+  document.getElementById('ticket-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); classifyTicket(); }
+  });
+
+  renderAnalytics();
+</script>
+</body>
+</html>

@@ -2,26 +2,19 @@ import re
 import nltk
 from nltk.corpus import stopwords
 
-# Download stopwords (runs once)
-nltk.download('stopwords')
+nltk.download('stopwords', quiet=True)
 
 STOP_WORDS = set(stopwords.words('english'))
 
 def clean_text(text: str) -> str:
     """
-    Clean and preprocess text data.
-
-    خطوات:
-    - Lowercase
-    - Remove punctuation
-    - Remove extra spaces
-    - Remove stopwords
+    Clean and normalize text for NLP processing.
     """
     text = str(text).lower()
-    text = re.sub(r'\W', ' ', text)        # remove punctuation
-    text = re.sub(r'\s+', ' ', text)       # remove extra spaces
-    
-    words = text.split()
-    words = [word for word in words if word not in STOP_WORDS]
-    
-    return " ".join(words)
+    text = re.sub(r'[^a-zA-Z\s]', '', text)   # keep only letters
+    text = re.sub(r'\s+', ' ', text).strip()
+
+    tokens = text.split()
+    tokens = [word for word in tokens if word not in STOP_WORDS]
+
+    return " ".join(tokens)
